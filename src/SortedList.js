@@ -60,7 +60,7 @@ export class SortedList extends IndexedCollection {
       return empty;
     }
     assertNotInfinite(size);
-    return empty.withMutations((list) => {
+    return empty.withMutations(list => {
       iter.forEach((v) => list.add(v));
     });
   }
@@ -74,7 +74,7 @@ export class SortedList extends IndexedCollection {
   }
 
   _makeVnode(array) { // Note empty VNodes are not allowed
-    return new VNode(array, this._key(array[0]), this._key(array[array.length-1])
+    return new VNode(array, this._key(array[0]), this._key(array[array.length-1]))
   }
 
   _nodeCmp(vnode, key) { // 0 if within range, -1 or 1 if outside // NOT USED
@@ -253,7 +253,7 @@ export class SortedList extends IndexedCollection {
 
   unshift(/*...values*/) {
     const values = arguments;
-    return this.withMutations((list) => {
+    return this.withMutations(list => {
       setListBounds(list, -values.length);
       for (let ii = 0; ii < values.length; ii++) {
         list.set(ii, values[ii]);
@@ -286,8 +286,8 @@ export class SortedList extends IndexedCollection {
     if (this.size === 0 && !this.__ownerID && seqs.length === 1) {
       return this.constructor(seqs[0]);
     }
-    return this.withMutations((list) => {
-      seqs.forEach((seq) => seq.forEach((value) => list.push(value)));
+    return this.withMutations(list => {
+      seqs.forEach(seq => seq.forEach(value => list.push(value)));
     });
   }
 
@@ -296,7 +296,7 @@ export class SortedList extends IndexedCollection {
   }
 
   map(mapper, context) {
-    return this.withMutations((list) => {
+    return this.withMutations(list => {
       for (let i = 0; i < this.size; i++) {
         list.set(i, mapper.call(context, list.get(i), i, list));
       }
