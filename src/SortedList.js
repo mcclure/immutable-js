@@ -18,7 +18,6 @@ import {
   resolveBegin,
   resolveEnd,
 } from './TrieUtils';
-import { IS_LIST_SYMBOL, isList } from './predicates/isList';
 import { IndexedCollection } from './Collection';
 import { hasIterator, Iterator, iteratorValue, iteratorDone } from './Iterator';
 import { setIn } from './methods/setIn';
@@ -37,6 +36,12 @@ const identity = x => x;
 const lt = (x,y) => x < y;
 const NODEMAX = 2 << SHIFT;
 const NODEMID = NODEMAX / 2;
+
+const IS_SORTED_LIST_SYMBOL = '@@__IMMUTABLE_SORTED_LIST__@@';
+
+export function isSortedList(maybeList) {
+  return Boolean(maybeList && maybeList[IS_SORTED_LIST_SYMBOL]);
+}
 
 // Invariants:
 // - vnodes always contain at least one item
@@ -364,10 +369,10 @@ export class SortedList extends IndexedCollection {
   }
 }
 
-List.isList = isList;
+SortedList.isSortedList = isSortedList;
 
-export const SortedListPrototype = List.prototype;
-SortedListPrototype[IS_LIST_SYMBOL] = true;
+export const SortedListPrototype = SortedList.prototype;
+SortedListPrototype[IS_SORTED_LIST_SYMBOL] = true;
 SortedListPrototype[DELETE] = SortedListPrototype.remove;
 SortedListPrototype.merge = SortedListPrototype.concat;
 SortedListPrototype.setIn = setIn;
