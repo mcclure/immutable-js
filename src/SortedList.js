@@ -94,14 +94,14 @@ export class SortedList extends IndexedCollection {
 
   // Note: No attempt at sort stability is attempted
   add(value) {
-    if (!this.root) {
+    if (!this._root) {
       const root = this._makeVnode([value])
       return makeSortedList(1, 1, root, root, root, this._key, this._lt, this.__hash)
     }
     let maxLevel = this._level, head = null, tail = null;
     const key = this._key(value);
     const isMin = !this._lt(this._root.min, key); // Key will be inserted into current head vnode
-    const isMax = !isHead || !this._lt(key, this._root.max); // Key will be inserted into current tail vnode
+    const isMax = !isMin || !this._lt(key, this._root.max); // Key will be inserted into current tail vnode
     const stack = [{ // : {node:VNode, isMin?:boolean, isMax?:boolean, index?:number}
       node:this._root,
       isMin:isMin, // Key is lte the vnode min-- don't have to find a position, just shove at beginning
@@ -191,8 +191,8 @@ export class SortedList extends IndexedCollection {
         // Now we know what node is the leaf node, figure out what index to insert into the leaf at
         let minIndex = 0;
         let maxIndex = leafNode.array.length;
-        let maxKey = this._key(pusharray[maxIndex])
-        let minKey = this._key(pushArray[0])
+        let maxKey = this._key(leafNode.array[maxIndex])
+        let minKey = this._key(leafNode.array[0])
 
         if (top.isMax || !this._lt(key, maxKey)) { // We are off the bottom or equal to bottom
           maxIndex = minIndex = maxIndex + 1;
@@ -202,7 +202,7 @@ export class SortedList extends IndexedCollection {
           // We binary search until maxIndex is gte the key, minIndex is lt the key, and maxIndex-minIndex=1
           while (minIndex < maxIndex - 1) {
             let searchIndex = Math.ceil((minIndex+maxIndex)/2)
-            let searchKey = this._key(pushArray[searchIndex])
+            let searchKey = this._key(leafNode.array[searchIndex])
             if (this._lt(key, searchKey)) {
               minIndex = searchIndex;
             } else {
