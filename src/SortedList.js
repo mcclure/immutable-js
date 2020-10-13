@@ -38,7 +38,8 @@ const lt = (x,y) => x < y;
 const NODEMAX = 2 << SHIFT;
 const NODEMID = NODEMAX / 2;
 
-const IS_SORTED_LIST_SYMBOL = '@@__IMMUTABLE_SORTED_LIST__@@';
+const IS_SORTED_LIST_SYMBOL      = '@@__IMMUTABLE_SORTED_LIST__@@';
+const IS_SORTED_LIST_NODE_SYMBOL = '@@__IMMUTABLE_SORTED_LIST_NODE__@@';
 
 export function isSortedList(maybeList) {
   return Boolean(maybeList && maybeList[IS_SORTED_LIST_SYMBOL]);
@@ -408,6 +409,7 @@ class VNode {
     this.max = max;
   }
 }
+VNode.prototype[IS_SORTED_LIST_NODE_SYMBOL] = true
 
 function vnodeReplace(node, index, value, key) { // key optional if value is node
   const array = [...node.array]; // Copy array
