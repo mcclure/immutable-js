@@ -97,10 +97,11 @@ export class SortedList extends IndexedCollection {
       const root = this._makeVnode([value])
       return makeSortedList(1, 1, root, root, root, this._key, this._lt, this.__hash)
     }
-    const key = this._key(value)
+    let maxLevel = this._level, head = null, tail = null;
+    const key = this._key(value);
     const isMin = !this._lt(this._root.min, key); // Key will be inserted into current head vnode
     const isMax = !isHead || !this._lt(key, this._root.max); // Key will be inserted into current tail vnode
-    const stack = [{ // : {node:VNode, isMin?:boolean, isMax?:boolean, idx?:number}
+    const stack = [{ // : {node:VNode, isMin?:boolean, isMax?:boolean, index?:number}
       node:this._root,
       isMin:isMin, // Key is lte the vnode min-- don't have to find a position, just shove at beginning
       isMax:isMax  // Key is gte the vnode max-- don't have to find a position, just shove at end
@@ -109,47 +110,47 @@ export class SortedList extends IndexedCollection {
     for(let level = 0;; level++) {
       const top = stack[stack.length-1];
       const array = top.node.array
-      if (level < this._level - 1) { // Branch nodes
+      if (level < maxLevel - 1) { // Branch nodes
         if (top.isMax) { // Pass through a previously figured out isMax (bias high)
-          const idx = array.length-1;
-          top.idx = idx;
-          stack.push({node:array[idx], isMax:true})
+          const index = array.length-1;
+          top.index = index;
+          stack.push({node:array[index], isMax:true})
         } else if (top.isMin) { // Pass through a previously figured out isMin
-          top.idx = 0;
+          top.index = 0;
           stack.push({node:array[0], isMin:true});
         } else { // Look within vnode to find best index
-          let maxIdx = array.length-1
-          if (!this._lt(key, array[maxIdx].max)) { // Identify an isMax (bias high)
-            top.idx = maxIdx;
-            stack.push({node:array[maxIdx], isMax: true})
+          let maxIndex = array.length-1
+          if (!this._lt(key, array[maxIndex].max)) { // Identify an isMax (bias high)
+            top.index = maxIndex;
+            stack.push({node:array[maxIndex], isMax: true})
           } else if (!this._lt(array[0].min, key)) { // Identify an isMin (bias high)
             stack.push({node:array[0], isMin:true})
           } else { // Binary search within vnode to find best index
-            let minIdx = 0; // Target node is now known to be somewhere between minIdx and maxIdx inclusive
+            let minIndex = 0; // Target node is now known to be somewhere between minIndex and maxIndex inclusive
             let isMax = false;
-            if (!this._lt(key, array[maxIdx].min)) {
-              minIdx = maxIdx; // Key is inside array[maxIdx]
+            if (!this._lt(key, array[maxIndex].min)) {
+              minIndex = maxIndex; // Key is inside array[maxIndex]
             } else if (this._lt(array[0].max, key)) { // Skip search if key inside array[0]
-              // Target node is now known to be somewhere between minIdx and maxIdx exclusive. We narrow the
-              // range until either we happen on the cell containing key, or minIdx and maxIdx are exactly
-              // 1 apart (in which case we've proven the key is in the gap between minIdx and maxIdx, at which
-              // point we arbitrarily choose to descend into minIdx so we can add at the end of an array).
+              // Target node is now known to be somewhere between minIndex and maxIndex exclusive. We narrow the
+              // range until either we happen on the cell containing key, or minIndex and maxIndex are exactly
+              // 1 apart (in which case we've proven the key is in the gap between minIndex and maxIndex, at which
+              // point we arbitrarily choose to descend into minIndex so we can add at the end of an array).
               isMax = true; // Setting on the assumption we'll stop on the "exactly 1 apart" condition.
-              while (minIdx < maxIdx - 1) {
-                let searchIdx = Math.ceil((minIdx+maxIdx)/2)
-                if (this._lt(key, array[searchIdx].min)) {
-                  maxIdx = searchIdx; // Target node now known to be between minIdx and searchIdx exclusive
-                } else if (this._lt(array[searchIdx].max, key)) {
-                  minIdx = searchIdx; // Target node now known to be between searchIdx and maxIdx exclusive
+              while (minIndex < maxIndex - 1) {
+                let searchIndex = Math.ceil((minIndex+maxIndex)/2)
+                if (this._lt(key, array[searchIndex].min)) {
+                  maxIndex = searchIndex; // Target node now known to be between minIndex and searchIndex exclusive
+                } else if (this._lt(array[searchIndex].max, key)) {
+                  minIndex = searchIndex; // Target node now known to be between searchIndex and maxIndex exclusive
                 } else { // Oh, we found it.
-                  minIdx = searchIdx;
+                  minIndex = searchIndex;
                   isMax = false; // Guess we aren't hitting "exactly 1 apart" after all
                   break;
                 }
               }
             }
-            top.idx = minIdx; // Descend into min index so if we're adding "between" we still add at end of array
-            stack.push({node:array[minIdx], isMax:isMax})
+            top.index = minIndex; // Descend into min index so if we're adding "between" we still add at end of array
+            stack.push({node:array[minIndex], isMax:isMax})
           }
         }
       } else { // We are now looking at a leaf node, and "stack" contains a complete route from the root to the leaf.
@@ -157,50 +158,67 @@ export class SortedList extends IndexedCollection {
         let leafNode;      // Leaf array we will be searching
         let lastNode;      // What is the last singular node we created?
         let lastNodeLevel; // At what level was the last singular node we created?
+        let checkHeadTail = false; // Set true if the leaf node has a chance to change head/tail.
 
         let lastLeft, lastRight;
 
         // First thing to do is find the leaf node
         if (!leafOverflow) { // It's either the leaf we were already looking at
           leafNode = top.node;
+
+          checkHeadTail = true; // When we insert our modified leaf node, maybe head or tail changes
         } else { // Or else we have to create it by splitting
           let lastLeft = new VNode(array.slice(0,NODEMID), top.node.min, this._key(array[NODEMID-1]));
           let lastRight = new VNode(array.slice(NODEMID), this._key(array[NODEMID]), top.node.max);
           leafNode = // Which of the two new nodes will we insert value into below?
             this._lt(key, this._key(right[0])) ? lastLeft : lastRight;
-        }
 
-        // Now we know what node to insert into, figure out what index to insert at
-        let minIdx = 0;
-        let maxIdx = leafNode.array.length;
-        let maxKey = this._key(pusharray[maxIdx])
-        let minKey = this._key(pushArray[0])
-
-        if (top.isMax || !this._lt(key, maxKey)) { // We are off the bottom or equal to bottom
-          maxIdx = minIdx = maxIdx + 1;
-        } else if (top.isMin || !this._lt(minKey, key)) { // We are off the top or equal to top
-          maxIdx = 0;
-        } else { // Target node is somewhere between minIdx and maxIdx exclusive
-          // We binary search until maxIdx is gte the key, minIdx is lt the key, and maxIdx-minIdx=1
-          while (minIdx < maxIdx - 1) {
-            let searchIdx = Math.ceil((minIdx+maxIdx)/2)
-            let searchKey = this._key(pushArray[searchIdx])
-            if (this._lt(key, searchKey)) {
-              minIdx = searchIdx;
-            } else {
-              maxIdx = searchIdx;
+          // Head/tail can change when a leaf node splits
+          if (stack.length <= 1) { // We split single node into a head and a tail
+            head = lastLeft;
+            tail = lastRight;
+          } else { // The head or tail MAY or MAY NOT have changed.
+            const preTop = stack[stack.length-2];
+            if (preTop.index == 0) {
+              head = lastLeft;
+            } else if (preTop.index == preTop.node.array.length-1) {
+              tail = lastRight;
             }
           }
         }
 
-        // The search ends with maxIdx as the insert index:
+        // Now we know what node is the leaf node, figure out what index to insert into the leaf at
+        let minIndex = 0;
+        let maxIndex = leafNode.array.length;
+        let maxKey = this._key(pusharray[maxIndex])
+        let minKey = this._key(pushArray[0])
+
+        if (top.isMax || !this._lt(key, maxKey)) { // We are off the bottom or equal to bottom
+          maxIndex = minIndex = maxIndex + 1;
+        } else if (top.isMin || !this._lt(minKey, key)) { // We are off the top or equal to top
+          maxIndex = 0;
+        } else { // Target node is somewhere between minIndex and maxIndex exclusive
+          // We binary search until maxIndex is gte the key, minIndex is lt the key, and maxIndex-minIndex=1
+          while (minIndex < maxIndex - 1) {
+            let searchIndex = Math.ceil((minIndex+maxIndex)/2)
+            let searchKey = this._key(pushArray[searchIndex])
+            if (this._lt(key, searchKey)) {
+              minIndex = searchIndex;
+            } else {
+              maxIndex = searchIndex;
+            }
+          }
+        }
+
+        // The search inside the leaf ends with maxIndex as the insert index:
         if (!leafOverflow) {
-          lastNode = vnodeInsert(leafNode, maxIdx, value, key);
+          lastNode = vnodeInsert(leafNode, maxIndex, value, key);
 
           lastNodeLevel = level;
         } else { // In the overflow case we own the only reference to (created) the node and can mutate it
-          vnodeMutateInsert(leafNode, maxIdx, value, key);
+          vnodeMutateInsert(leafNode, maxIndex, value, key);
 
+          // The leaf is now dealt with, but since we're in the overflow path we have to handle splits.
           // We split the node above into lastLeft and lastRight. Now we need to put them in the tree, 
           // but that may trigger more splits. Walk backward up the tree until there are no more splits:
           for(lastNodeLevel = level-1; lastNodeLevel >= 0; lastNodeLevel--) {
@@ -229,18 +247,31 @@ export class SortedList extends IndexedCollection {
             }
           }
           if (lastNodeLevel < 0) { // We split the entire tree, so we need to make a new root node.
-            lastNode = new VNode([lastLeft, lastRight], lastLeft.min, lastRight.max)
+            lastNode = new VNode([lastLeft, lastRight], lastLeft.min, lastRight.max);
+            maxLevel++;
           }
         }
 
-        // Walk backward up the tree from just above our leaf
-        // (or, from just above the highest split point) to the root
+        // The leaf and the splits are dealt with, now it's just the rest of the tree. Walk backward
+        // up the tree from just above our leaf (or, from just above the highest split point) to the root
         for(lastNodeLevel--; lastNodeLevel >= 0; lastNodeLevel--) {
           const top = stack[lastNodeLevel];
+
+          if (checkHeadTail) { // We might have to adjust head/tail on the first pass of this loop.
+            if (top.index == 0) {
+              head = lastNode;
+            } else if (top.index == top.node.array.length-1) {
+              tail = lastNode;
+            }
+            checkHeadTail = false; 
+          }
+
           lastNode = vnodeInsert(top.node, top.index, lastNode)
         }
 
-        return lastNode;
+        // We've walked all the way up to the top now, so lastNode is new root.
+        return makeSortedList(this.size+1, maxLevel, lastNode, head || this._head, tail || this._tail,
+                              this._key, this._lt, this.__hash)
       }
     }
   }
@@ -345,29 +376,6 @@ export class SortedList extends IndexedCollection {
     }
     return index;
   }
-
-  __ensureOwner(ownerID) {
-    if (ownerID === this.__ownerID) {
-      return this;
-    }
-    if (!ownerID) {
-      if (this.size === 0) {
-        return emptySortedList();
-      }
-      this.__ownerID = ownerID;
-      this.__altered = false;
-      return this;
-    }
-    return makeSortedList(
-      this._origin,
-      this._capacity,
-      this._level,
-      this._root,
-      this._tail,
-      ownerID,
-      this.__hash
-    );
-  }
 }
 
 SortedList.isSortedList = isSortedList;
@@ -437,11 +445,11 @@ function makeSortedList(size, level, root, head, tail, keyFn, ltFn, hash) {
   const list = Object.create(SortedListPrototype);
   list.size = size;
   list._level = level;
-  list._root = level;
+  list._root = root;
   list._head = head;
   list._tail = tail;
-  list._key = keyFn;
-  list._lt = ltFn;
+  list._key = keyFn || identity;
+  list._lt = ltFn || lt;
   list.__hash = hash; // ENTIRELY UNCLEAR WHAT THIS DOES-- TODO-ANDI
   list.__altered = false;
   return list;
