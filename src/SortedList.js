@@ -108,6 +108,7 @@ export class SortedList extends IndexedCollection {
       isMin:isMin, // Mark no searching needed
       isMax:isMax  // Mark no searching needed // FIXME FUTURE ANDI: The problem is min/max are not changing on second add
     }];
+    let descendMin = true, descendMax = true; // True if we have taken only min/max descents
     // First descend into the tree and find the insertion point
     for(let level = 0;; level++) {
       const top = stack[stack.length-1];
@@ -117,9 +118,11 @@ export class SortedList extends IndexedCollection {
           const index = array.length-1;
           top.index = index;
           stack.push({node:array[index], isMax:true})
+          descendMin = false;
         } else if (top.isMin) { // Pass through a previously figured out isMin
           top.index = 0;
           stack.push({node:array[0], isMin:true});
+          descendMax = false;
         } else { // Binary search within node to find best index
           let maxIndex = array.length-1;
           let minIndex = 0; // Target node is currently known to be somewhere between minIndex and maxIndex inclusive
@@ -147,8 +150,14 @@ export class SortedList extends IndexedCollection {
               }
             }
           }
+
           top.index = minIndex; // Descend into min index so if we're adding "between" we still add at end of array
           
+          if (descendMin && minIndex != 0)
+            descendMin = false;
+          if (descendMax && minIndex != array.length-1)
+            descendMax = false;
+
           let isMin = false;
           if (!isMax) {
             if (minIndex == 0 && !this._lt(array[0].min, key)) {
@@ -193,10 +202,9 @@ console.log({a2:lastLeft.min, b2:lastLeft.max, c2:lastRight.min, d2:lastRight.ma
             head = lastLeft;
             tail = lastRight;
           } else { // The head or tail MAY or MAY NOT have changed.
-            const preTop = stack[stack.length-2];
-            if (preTop.index == 0) {
+            if (descendMin) {
               head = lastLeft;
-            } else if (preTop.index == preTop.node.array.length-1) {
+            } else if (descendMax) {
               tail = lastRight;
             }
           }
