@@ -292,6 +292,9 @@ console.log({lastNodeLevel, lastNode, lastLeft, lastRight})
 
           lastNode = vnodeInsert(top.node, top.index, lastNode)
         }
+        if (checkHeadTail && stack.length == 1) {
+          head = tail = lastNode;
+        }
 
         // We've walked all the way up to the top now, so lastNode is new root.
         return makeSortedList(this.size+1, maxLevel, lastNode, head || this._head, tail || this._tail,
