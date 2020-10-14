@@ -180,15 +180,13 @@ export class SortedList extends IndexedCollection {
         // First we need to find or create the true leaf node.
         if (!leafOverflow) { // It's either the leaf we were already looking at
           leafNode = top.node;
-
-          checkHeadTail = true; // (When we insert our modified leaf node later, maybe head or tail changes)
         } else { // Or else we have to create it by splitting
           lastLeft = new VNode(array.slice(0,NODEMID), top.node.min, this._key(array[NODEMID-1]));
           lastRight = new VNode(array.slice(NODEMID), this._key(array[NODEMID]), top.node.max);
-console.log({a:top.node.min, b:this._key(array[NODEMID-1]), c:this._key(array[NODEMID]), d:top.node.max})
-console.log({a2:lastLeft.min, b2:lastLeft.max, c2:lastRight.min, d2:lastRight.max, key})
           
           const branchLeft = this._lt(key, lastRight.min)
+console.log({a:top.node.min, b:this._key(array[NODEMID-1]), c:this._key(array[NODEMID]), d:top.node.max})
+console.log({a2:lastLeft.min, b2:lastLeft.max, c2:lastRight.min, d2:lastRight.max, key, branchLeft})
           leafNode = // Which of the two new nodes will we insert value into below?
             branchLeft ? lastLeft : lastRight;
           if (branchLeft) { // The split may have broken isMax/isMin.
@@ -241,8 +239,15 @@ console.log({what:"search", searchIndex, searchKey})
         if (!leafOverflow) {
 console.log({leafNode, maxIndex, value, key})
           lastNode = vnodeInsert(leafNode, maxIndex, value, key);
-
           lastNodeLevel = level;
+
+          if (stack.length == 1) {
+            head = tail = lastNode;
+          } else if (descendMin) {
+            head = lastNode;
+          } else if (descendMax) {
+            tail = lastNode;
+          }
         } else { // In the overflow case we own the only reference to (created) the node and can mutate it
 console.log({what:"willSplit", maxIndex, value, key, level, "limit":leafNode.array.length})
           vnodeMutateInsert(leafNode, maxIndex, value, key);
@@ -289,19 +294,7 @@ console.log({lastNodeLevel, lastNode, lastLeft, lastRight})
         for(lastNodeLevel--; lastNodeLevel >= 0; lastNodeLevel--) {
           const top = stack[lastNodeLevel];
 
-          if (checkHeadTail) { // We might have to adjust head/tail on the first pass of this loop.
-            if (top.index == 0) {
-              head = lastNode;
-            } else if (top.index == top.node.array.length-1) {
-              tail = lastNode;
-            }
-            checkHeadTail = false; 
-          }
-
           lastNode = vnodeReplace(top.node, top.index, lastNode)
-        }
-        if (checkHeadTail && stack.length == 1) {
-          head = tail = lastNode;
         }
 
         // We've walked all the way up to the top now, so lastNode is new root.
