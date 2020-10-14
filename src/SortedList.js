@@ -290,7 +290,7 @@ console.log({lastNodeLevel, lastNode, lastLeft, lastRight})
             checkHeadTail = false; 
           }
 
-          lastNode = vnodeInsert(top.node, top.index, lastNode)
+          lastNode = vnodeReplace(top.node, top.index, lastNode)
         }
         if (checkHeadTail && stack.length == 1) {
           head = tail = lastNode;
@@ -298,7 +298,7 @@ console.log({lastNodeLevel, lastNode, lastLeft, lastRight})
 
         // We've walked all the way up to the top now, so lastNode is new root.
         return makeSortedList(this.size+1, maxLevel, lastNode, head || this._head, tail || this._tail,
-                              this._key, this._lt, this.__hash)
+                              this._key, this._lt, this.__hash);
       }
     }
   }
@@ -440,16 +440,16 @@ VNode.prototype[IS_SORTED_LIST_NODE_SYMBOL] = true
 function vnodeReplace(node, index, value, key) { // key optional if value is node
   const array = [...node.array]; // Copy array
   array[index] = value;          // Replace index value
-  const min = index == 0 ? (key || value.min) : node.min; // Adjust edges
-  const max = index == array.length-1 ? (key || value.max) : node.max;
+  const min = index == 0 ? (key != null ? key : value.min) : node.min; // Adjust edges
+  const max = index == array.length-1 ? (key != null ? key : value.max) : node.max;
   return new VNode(array, min, max)
 }
 
 function vnodeInsert(node, index, value, key) { // key optional if value is node
   const oldArray = node.array;
   const array = [...oldArray.slice(0,index), value, ...oldArray.slice(index)]
-  const min = index == 0 ? (key || value.min) : node.min;
-  const max = index == oldArray.length ? (key || value.max) : node.max;
+  const min = index == 0 ? (key != null ? key : value.min) : node.min;
+  const max = index == oldArray.length ? (key != null ? key : value.max) : node.max;
 console.log({what:"insert", oldLength:oldArray.length, newLength:array.length, min, max, index, value, key})
   return new VNode(array, min, max)
 }
@@ -457,9 +457,9 @@ console.log({what:"insert", oldLength:oldArray.length, newLength:array.length, m
 function vnodeMutateReplace(node, index, value, key) { // key optional if value is node
   node.array[index] = value;
   if (index == 0)
-    node.min = key || value.min;
+    node.min = (key != null ? key : value.min);
   if (index == node.array.length-1)
-    node.max = key || value.max;
+    node.max = (key != null ? key : value.max);
 }
 
 function vnodeMutateInsert(node, index, value, key) { // key optional if value is node
@@ -468,9 +468,9 @@ console.log({what:"preMutate", index, array:[...node.array]})
 console.log({what:"postMutate", index, array:[...node.array], len:node.array.length})
 
   if (index == 0)
-    node.min = key || value.min;
+    node.min = (key != null ? key : value.min);
   if (index == node.array.length-1)
-    node.max = key || value.max;
+    node.max = (key != null ? key : value.max);
 }
 
 function makeSortedList(size, level, root, head, tail, keyFn, ltFn, hash) {
