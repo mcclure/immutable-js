@@ -19,7 +19,7 @@ import {
   resolveBegin,
   resolveEnd,
 } from './TrieUtils';
-import { IndexedCollection } from './Collection';
+import { SetCollection } from './Collection';
 import { hasIterator, Iterator, iteratorValue, iteratorDone } from './Iterator';
 import { setIn } from './methods/setIn';
 import { deleteIn } from './methods/deleteIn';
@@ -51,7 +51,7 @@ export function isSortedList(maybeList) {
 // - vnodes never contain more than NODEMAX (32) items
 // - branch (non-leaf) vnodes always contain at least two items (THIS IS NOT A VALID ASSUMPTION)
 
-export class SortedList extends IndexedCollection {
+export class SortedList extends SetCollection {
   // @pragma Construction
 
   constructor(value) {
@@ -85,21 +85,13 @@ export class SortedList extends IndexedCollection {
     return new VNode(array, this._key(array[0]), this._key(array[array.length-1]))
   }
 
-  _nodeCmp(vnode, key) { // 0 if within range, -1 or 1 if outside // NOT USED
-    if (this._lt(key, vnode.min))
-      return -1;
-    if (this._lt(vnode.max, key))
-      return 1;
-    return 0;
-  }
-
-  // Note: No attempt at sort stability is attempted
+  // Note: No attempt is made at sort stability
   add(value) {
     if (!this._root) {
       const root = this._makeVnode([value])
       return makeSortedList(1, 1, root, root, root, this._key, this._lt, this.__hash)
     }
-    let maxLevel = this._level, head = null, tail = null;
+    let maxLevel = this._level, head, tail;
     const key = this._key(value);
     const isMax = !this._lt(key, this._root.max); // Key is gte max of root. Will be inserted into current tail vnode
     const isMin = !isMax && !this._lt(this._root.min, key); // Key is lte min of root. Will be inserted into current head vnode
@@ -295,7 +287,7 @@ console.log({lastNodeLevel, lastNode, lastLeft, lastRight})
         for(lastNodeLevel--; lastNodeLevel >= 0; lastNodeLevel--) {
           const top = stack[lastNodeLevel];
 
-          lastNode = vnodeReplace(top.node, top.index, lastNode)
+          lastNode = vnodeReplace(top.node, top.index, lastNode);
         }
 
         // We've walked all the way up to the top now, so lastNode is new root.
@@ -309,26 +301,99 @@ console.log({lastNodeLevel, lastNode, lastLeft, lastRight})
     if (this.size === 0) {
       return this;
     }
-    return emptySortedList();
+    return makeSortedList(0, 0, null, null, null,
+                          this._key, this._lt, this.__hash);
   }
 
-  pop() { // Remove from right
-    
-    return setListBounds(this, 0, -1);
+  // Query least
+  first(notSetValue) {
+    if (this.size == 0) {
+      return notSetValue;
+    }
+    return this._head.array[0]
   }
 
-  unshift(/*...values*/) {
-    const values = arguments;
-    return this.withMutations(list => {
-      setListBounds(list, -values.length);
-      for (let ii = 0; ii < values.length; ii++) {
-        list.set(ii, values[ii]);
-      }
-    });
+  // Query greatest
+  last(notSetValue) {
+    if (this.size == 0) {
+      return notSetValue;
+    }
+    const tailArray = this._tail.array;
+    return tailArray[tailArray.length-1]
   }
 
-  shift() {
+  shift() { // Remove least
     return setListBounds(this, 1);
+  }
+
+  pop() { // Remove greatest
+    if (this.size == 0) {
+      throw new Error("Popping from empty collection")
+    }
+    if (this.size == 1) {
+      return this.clear();
+    }
+    const stack = [this._root] // Stack of nodes
+    const maxLevel = this._level; // Original level count
+    let levelAdjust = 0;
+    // First just make a list of "rightmost" nodes.
+    for(let level = 0; level < maxLevel-1; level++) {
+      const node = stack[level];
+      const array = node.array;
+console.log({what:"stack push", node})
+      stack.push(array[array.length-1]);
+    }
+    let lastNode; // Last created node
+    let max, head, tail;
+console.log({maxLevel, stackLength:stack.length})
+    // Special behavior for the rightmost leaf node
+    {
+      const node = stack.pop();
+      const nodeArray = node.array;
+      if (nodeArray.length > 1) {
+        const array = nodeArray.slice(0,-1);
+        max = this._key(array[array.length-1]); // This is the only situation where a max must be calculated
+        tail = lastNode = new VNode(array, node.min, max);
+      }
+    }
+    if (!lastNode) { // Rightmost leaf node has been erased completely!
+      while (stack.length > 0) { // Walk up the stack until we find a node long enough to survive:
+        const node = stack.pop();
+        const nodeArray = node.array;
+        const arrayLength = nodeArray.length;
+console.log({what:"pruning", length:nodeArray.length, stackLengthAfter:stack.length})
+        if (stack.length == 0 && arrayLength <= 2) { // We hit the top of the tree, and the root only has one child!
+          lastNode = node.array[0]; // Make that child the new root.
+          max = lastNode.max;
+console.log({what:"Reroot", lastNode, max})
+          levelAdjust--;
+        } else if (arrayLength > 1) { // Expected case: We found a suitable node
+          const array = nodeArray.slice(0,-1); // Mark we removed the leaf node (and maybe some parent branches)
+          max = array[array.length-1].max;
+          lastNode = new VNode(array, node.min, max);
+console.log({what:"FoundClipParent", max, lastNode})
+          break;
+        }
+      }
+      // Now that we've walked up to find a node that survives, we need to walk back *down* again...
+      tail = lastNode;
+      const walkLength = maxLevel - stack.length - 1 + levelAdjust;
+console.log({what:"DidPruneWalk", lastNode, max, levelAdjust, walkLength})
+      for (let level = 0; level < walkLength; level++) {
+        const array = tail.array;
+        tail = array[array.length-1]; // ...to find the new tail.
+      }
+    }
+    // We're now done deleting content and just need to walk up to the root marking our changes.
+    while (stack.length > 0) {
+      const node = stack.pop();
+console.log({what:"FinalReplace", stackLength:stack.length, length:node.array.length})
+      lastNode = vnodeReplace(node, node.array.length-1, lastNode, max);
+    }
+
+    return makeSortedList(this.size-1, maxLevel + levelAdjust, lastNode,
+                          maxLevel+levelAdjust == 1 ? lastNode : this._head, tail,
+                          this._key, this._lt, this.__hash);
   }
 
   // @pragma Composition
