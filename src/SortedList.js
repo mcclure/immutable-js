@@ -323,9 +323,76 @@ console.log({lastNodeLevel, lastNode, lastLeft, lastRight})
   }
 
   shift() { // Remove least
-    return setListBounds(this, 1);
+    if (this.size == 0) {
+      throw new Error("Shifting from empty collection")
+    }
+    if (this.size == 1) {
+      return this.clear();
+    }
+    const stack = [this._root] // Stack of nodes
+    const maxLevel = this._level; // Original level count
+    let levelAdjust = 0;
+    // First just make a list of "leftmost" nodes.
+    for(let level = 0; level < maxLevel-1; level++) {
+      const node = stack[level];
+      const array = node.array;
+console.log({what:"stack push", node})
+      stack.push(array[0]);
+    }
+    let lastNode; // Last created node
+    let min, head;
+console.log({maxLevel, stackLength:stack.length})
+    // Special behavior for the leftmost leaf node
+    {
+      const node = stack.pop();
+      const nodeArray = node.array;
+      if (nodeArray.length > 1) {
+        const array = nodeArray.slice(1);
+        min = this._key(array[0]); // This is the only situation where a max must be calculated
+        head = lastNode = new VNode(array, min, node.max);
+      }
+    }
+    if (!lastNode) { // Leftmost leaf node has been erased completely!
+      while (stack.length > 0) { // Walk up the stack until we find a node long enough to survive:
+        const node = stack.pop();
+        const nodeArray = node.array;
+        const arrayLength = nodeArray.length;
+console.log({what:"pruning", length:nodeArray.length, stackLengthAfter:stack.length})
+        if (stack.length == 0 && arrayLength <= 2) { // We hit the top of the tree, and the root only has one child!
+          // FIXME: By carefully shifting and popping it's actually possible to get a 1-length root despite this check.
+          lastNode = nodeArray[arrayLength-1]; // Make that child the new root. // FIXME could this index be hardcoded to 1?
+          min = lastNode.min;
+console.log({what:"Reroot", lastNode, min})
+          levelAdjust--;
+        } else if (arrayLength > 1) { // Expected case: We found a suitable node
+          const array = nodeArray.slice(1); // Mark we removed the leaf node (and maybe some parent branches)
+          min = array[0].min;
+          lastNode = new VNode(array, min, node.max);
+console.log({what:"FoundClipParent", min, lastNode})
+          break;
+        }
+      }
+      // Now that we've walked up to find a node that survives, we need to walk back *down* again...
+      head = lastNode;
+      const walkLength = maxLevel - stack.length - 1 + levelAdjust;
+console.log({what:"DidPruneWalk", lastNode, min, levelAdjust, walkLength})
+      for (let level = 0; level < walkLength; level++) {
+        head = head.array[0]; // ...to find the new tail.
+      }
+    }
+    // We're now done deleting content and just need to walk up to the root marking our changes.
+    while (stack.length > 0) {
+      const node = stack.pop();
+console.log({what:"FinalReplace", stackLength:stack.length, length:node.array.length})
+      lastNode = vnodeReplace(node, 0, lastNode, min);
+    }
+
+    return makeSortedList(this.size-1, maxLevel + levelAdjust, lastNode,
+                          head, maxLevel+levelAdjust == 1 ? lastNode : this._tail,
+                          this._key, this._lt, this.__hash);
   }
 
+  // Note code is substantially similar to shift but using array-last members, tails and maxes
   pop() { // Remove greatest
     if (this.size == 0) {
       throw new Error("Popping from empty collection")
@@ -344,7 +411,7 @@ console.log({what:"stack push", node})
       stack.push(array[array.length-1]);
     }
     let lastNode; // Last created node
-    let max, head, tail;
+    let max, tail;
 console.log({maxLevel, stackLength:stack.length})
     // Special behavior for the rightmost leaf node
     {
