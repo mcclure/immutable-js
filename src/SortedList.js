@@ -263,15 +263,16 @@ console.log({what:"splitUp", lastNodeLevel, lastLeft, lastRight})
             const overflow = node.array.length >= NODEMAX;
             const left = lastLeft, right = lastRight;
             if (!overflow) { // Room for 1 more node. Do an insert of the left node:
-              node = vnodeInsert(node, top.index, left);
+              node = vnodeInsert(node, index, left);
             } else { // Need to do at least one more level of split:
               lastLeft = new VNode(node.array.slice(0,NODEMID), node.min, node.array[NODEMID-1].max);
               lastRight = new VNode(node.array.slice(NODEMID), node.array[NODEMID].min, node.max);
-              if (top.index < NODEMID) {
+console.log({index, NODEMID, NODEMAX});
+              if (index < NODEMID) {
                 node = lastLeft;
               } else {
-console.log({what:"mathMystery", index, node})
-                index -= NODEMAX;
+console.log({what:"mathMystery", index, node});
+                index -= NODEMID;
                 node = lastRight;
               }
               vnodeMutateInsert(node, index, left); // Since we created this node, we can mutate it
