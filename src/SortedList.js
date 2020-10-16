@@ -42,6 +42,34 @@ const NODEMID = NODEMAX / 2;
 const IS_SORTED_LIST_SYMBOL      = '@@__IMMUTABLE_SORTED_LIST__@@';
 const IS_SORTED_LIST_NODE_SYMBOL = '@@__IMMUTABLE_SORTED_LIST_NODE__@@';
 
+class SortedListIterator {
+  constructor(obj) {
+    this.obj = obj;
+    this.stack = []
+    if (obj._root)
+      this.stack.push({node:obj._root, index:0});
+  }
+
+  next() {
+    while (this.stack.length > 0) {
+      const stackLength = this.stack.length;
+      const top = this.stack[stackLength-1];
+      const array = top.node.array;
+      if (top.index >= array.length) {
+        this.stack.pop();
+      } else {
+        const value = array[top.index++];
+        if (stackLength < this.obj._level) {
+          this.stack.push({node:value, index:0})
+        } else {
+          return {value:value}
+        }
+      }
+    }
+    return {done:true}
+  }
+}
+
 export function isSortedList(maybeList) {
   return Boolean(maybeList && maybeList[IS_SORTED_LIST_SYMBOL]);
 }
@@ -561,6 +589,9 @@ SortedListPrototype['@@transducer/step'] = function (result, arr) {
 SortedListPrototype['@@transducer/result'] = function (obj) {
   return obj.asImmutable();
 };
+SortedListPrototype[Symbol.iterator] = function () {
+  return new SortedListIterator(this);
+}
 
 class VNode {
   constructor(array, min, max) {
