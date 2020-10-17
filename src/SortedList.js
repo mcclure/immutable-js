@@ -33,7 +33,7 @@ import { asImmutable } from './methods/asImmutable';
 import { wasAltered } from './methods/wasAltered';
 import assertNotInfinite from './utils/assertNotInfinite';
 
-const DEBUGMAX = 4; // Temporarily use a max size of 4 in order to test code
+const DEBUGMAX // = 4; // Temporarily use a max size of 4 in order to test code
 const identity = x => x;
 const lt = (x,y) => x < y;
 const NODEMAX = DEBUGMAX || (1 << SHIFT);
