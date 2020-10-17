@@ -42,6 +42,7 @@ const NODEMID = NODEMAX / 2;
 const IS_SORTED_LIST_SYMBOL      = '@@__IMMUTABLE_SORTED_LIST__@@';
 const IS_SORTED_LIST_NODE_SYMBOL = '@@__IMMUTABLE_SORTED_LIST_NODE__@@';
 
+// FIXME: This is an ES6 iterator, but immutable-js has its own iterator system.
 class SortedListIterator {
   constructor(obj) {
     this.obj = obj;
