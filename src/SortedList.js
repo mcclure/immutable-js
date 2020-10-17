@@ -269,7 +269,7 @@ console.log({leafNode, maxIndex, value, key})
           lastNode = vnodeInsert(leafNode, maxIndex, value, key, key);
           lastNodeLevel = level;
 
-          if (stack.length == 1) {
+          if (stack.length == 1) { // Assume a node can only be head AND tail if it's the root. Keeping this true requires special casing in shift/pop
             head = tail = lastNode;
           } else if (descendMin) {
             head = lastNode;
@@ -367,7 +367,7 @@ console.log({lastNodeLevel, lastNode, lastLeft, lastRight})
     }
     const stack = [this._root] // Stack of nodes
     const maxLevel = this._level; // Original level count
-    let levelAdjust = 0;
+    let levelAdjust = 0; // Number of levels we've shaved off in this pop
     // First just make a list of "leftmost" nodes.
     for(let level = 0; level < maxLevel-1; level++) {
       const node = stack[level];
@@ -396,11 +396,10 @@ console.log({what: "minning", min, max:node.max})
         const arrayLength = nodeArray.length;
 console.log({what:"pruning", length:nodeArray.length, stackLengthAfter:stack.length})
         if (stack.length == 0 && arrayLength <= 2) { // We hit the top of the tree, and the root only has one child!
-          // FIXME: By carefully shifting and popping it's actually possible to get a 1-length root despite this check.
           lastNode = nodeArray[arrayLength-1]; // Make that child the new root. // FIXME could this index be hardcoded to 1?
           min = lastNode.min;
 console.log({what:"Reroot", lastNode, min, max:node.max})
-          levelAdjust--;
+          levelAdjust++;
         } else if (arrayLength > 1) { // Expected case: We found a suitable node
           const array = nodeArray.slice(1); // Mark we removed the leaf node (and maybe some parent branches)
           min = array[0].min;
@@ -411,7 +410,7 @@ console.log({what:"FoundClipParent", min, lastNode})
       }
       // Now that we've walked up to find a node that survives, we need to walk back *down* again...
       head = lastNode;
-      const walkLength = maxLevel - stack.length - 1 + levelAdjust;
+      const walkLength = maxLevel - stack.length - 1 - levelAdjust;
 console.log({what:"DidPruneWalk", lastNode, min, levelAdjust, walkLength})
       for (let level = 0; level < walkLength; level++) {
         head = head.array[0]; // ...to find the new tail.
@@ -423,9 +422,14 @@ console.log({what:"DidPruneWalk", lastNode, min, levelAdjust, walkLength})
 console.log({what:"FinalReplace", stackLength:stack.length, length:node.array.length})
       lastNode = vnodeReplace(node, 0, lastNode, min);
     }
+    // Last ditch, rare check: Did we just accidentally create a branch node with exactly one element and set it as root?
+    while (lastNode.array.length == 1 && levelAdjust < maxLevel-1) {
+      lastNode = lastNode.array[0];
+      levelAdjust++;
+    }
 
-    return makeSortedList(this.size-1, maxLevel + levelAdjust, lastNode,
-                          head, maxLevel+levelAdjust == 1 ? lastNode : this._tail,
+    return makeSortedList(this.size-1, maxLevel - levelAdjust, lastNode,
+                          head, maxLevel-levelAdjust == 1 ? lastNode : this._tail,
                           this._key, this._lt, this.__hash);
   }
 
@@ -439,7 +443,7 @@ console.log({what:"FinalReplace", stackLength:stack.length, length:node.array.le
     }
     const stack = [this._root] // Stack of nodes
     const maxLevel = this._level; // Original level count
-    let levelAdjust = 0;
+    let levelAdjust = 0; // Number of levels we've shaved off in this pop
     // First just make a list of "rightmost" nodes.
     for(let level = 0; level < maxLevel-1; level++) {
       const node = stack[level];
@@ -470,7 +474,7 @@ console.log({what:"pruning", length:nodeArray.length, stackLengthAfter:stack.len
           lastNode = node.array[0]; // Make that child the new root.
           max = lastNode.max;
 console.log({what:"Reroot", lastNode, max})
-          levelAdjust--;
+          levelAdjust++;
         } else if (arrayLength > 1) { // Expected case: We found a suitable node
           const array = nodeArray.slice(0,-1); // Mark we removed the leaf node (and maybe some parent branches)
           max = array[array.length-1].max;
@@ -481,7 +485,7 @@ console.log({what:"FoundClipParent", max, lastNode})
       }
       // Now that we've walked up to find a node that survives, we need to walk back *down* again...
       tail = lastNode;
-      const walkLength = maxLevel - stack.length - 1 + levelAdjust;
+      const walkLength = maxLevel - stack.length - 1 - levelAdjust;
 console.log({what:"DidPruneWalk", lastNode, max, levelAdjust, walkLength})
       for (let level = 0; level < walkLength; level++) {
         const array = tail.array;
@@ -494,9 +498,14 @@ console.log({what:"DidPruneWalk", lastNode, max, levelAdjust, walkLength})
 console.log({what:"FinalReplace", stackLength:stack.length, length:node.array.length})
       lastNode = vnodeReplace(node, node.array.length-1, lastNode, null, max);
     }
+    // Last ditch, rare check: Did we just accidentally create a branch node with exactly one element and set it as root?
+    while (lastNode.array.length == 1 && levelAdjust < maxLevel-1) {
+      lastNode = lastNode.array[0];
+      levelAdjust++;
+    }
 
-    return makeSortedList(this.size-1, maxLevel + levelAdjust, lastNode,
-                          maxLevel+levelAdjust == 1 ? lastNode : this._head, tail,
+    return makeSortedList(this.size-1, maxLevel - levelAdjust, lastNode,
+                          maxLevel-levelAdjust == 1 ? lastNode : this._head, tail,
                           this._key, this._lt, this.__hash);
   }
 
