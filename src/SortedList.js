@@ -139,11 +139,13 @@ console.log({key, max:this._root.max, min:this._root.min, isMax, isMin})
           const index = array.length-1;
           top.index = index;
           stack.push({node:array[index], isMax:true})
-          descendMin = false;
+          if (array.length > 1)
+            descendMin = false;
         } else if (top.isMin) { // Pass through a previously figured out isMin
           top.index = 0;
           stack.push({node:array[0], isMin:true});
-          descendMax = false;
+          if (array.length > 1)
+            descendMax = false;
         } else { // Binary search within node to find best index
           let maxIndex = array.length-1;
           let minIndex = 0; // Target node is currently known to be somewhere between minIndex and maxIndex inclusive
@@ -189,7 +191,7 @@ console.log("FORCE MIN")
 console.log("FORCE MIN")
             }
           }
-console.log({what:"descend", minIndex, isMax, isMin, length:array.length})
+console.log({what:"descend", minIndex, isMax, isMin, length:array.length, descendMin, descendMax})
           stack.push({node:array[minIndex], isMax:isMax, isMin:isMin})
         }
       } else { // We are now looking at a leaf node, and "stack" contains a complete route from the root to the leaf.
@@ -239,7 +241,7 @@ console.log("SPLIT MIN")
         let maxIndex = leafNode.array.length-1;
         let maxKey = this._key(leafNode.array[maxIndex])
         let minKey = this._key(leafNode.array[0])
-console.log({isMin, isMax, leafOverflow, leafNode, minIndex, maxIndex, minKey, maxKey, stack})
+console.log({isMin, isMax, leafOverflow, leafNode, minIndex, maxIndex, minKey, maxKey, stack, descendMin, descendMax})
         if (top.isMax) { // We are off the bottom or equal to bottom
 console.log("ISMAX PATH")
           maxIndex = minIndex = maxIndex + 1;
