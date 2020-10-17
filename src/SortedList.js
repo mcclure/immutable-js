@@ -123,10 +123,11 @@ export class SortedList extends SetCollection {
     const key = this._key(value);
     const isMax = !this._lt(key, this._root.max); // Key is gte max of root. Will be inserted into current tail vnode
     const isMin = !isMax && !this._lt(this._root.min, key); // Key is lte min of root. Will be inserted into current head vnode
+console.log({key, max:this._root.max, min:this._root.min, isMax, isMin})
     const stack = [{ // : {node:VNode, isMin?:boolean, isMax?:boolean, index?:number}
       node:this._root,
       isMin:isMin, // Mark no searching needed
-      isMax:isMax  // Mark no searching needed // FIXME FUTURE ANDI: The problem is min/max are not changing on second add
+      isMax:isMax  // Mark no searching needed
     }];
     let descendMin = true, descendMax = true; // True if we have taken only min/max descents
     // First descend into the tree and find the insertion point
@@ -182,10 +183,13 @@ export class SortedList extends SetCollection {
           if (!isMax) {
             if (minIndex == 0 && !this._lt(array[0].min, key)) {
               isMin = true;
+console.log("FORCE MIN")
             } else if ((minIndex == array.length-1) && !this._lt(key, array[minIndex].max)) {
               isMax = true;
+console.log("FORCE MIN")
             }
           }
+console.log({what:"descend", minIndex, isMax, isMin, length:array.length})
           stack.push({node:array[minIndex], isMax:isMax, isMin:isMin})
         }
       } else { // We are now looking at a leaf node, and "stack" contains a complete route from the root to the leaf.
@@ -211,8 +215,10 @@ console.log({a2:lastLeft.min, b2:lastLeft.max, c2:lastRight.min, d2:lastRight.ma
             branchLeft ? lastLeft : lastRight;
           if (branchLeft) { // The split may have broken isMax/isMin.
             top.isMax = !this._lt(key, lastLeft.max) // key gte max of lastLeft
+console.log("SPLIT MAX")
           } else {
             top.isMin = !this._lt(lastRight.min, key) // key lte min of lastRight
+console.log("SPLIT MIN")
           }
 
           // Head/tail can change when a leaf node splits
@@ -234,7 +240,7 @@ console.log({a2:lastLeft.min, b2:lastLeft.max, c2:lastRight.min, d2:lastRight.ma
         let maxKey = this._key(leafNode.array[maxIndex])
         let minKey = this._key(leafNode.array[0])
 console.log({isMin, isMax, leafOverflow, leafNode, minIndex, maxIndex, minKey, maxKey, stack})
-        if (top.isMax) { // We are off the bottom or equal to bottom // FIXME redundant check?
+        if (top.isMax) { // We are off the bottom or equal to bottom
 console.log("ISMAX PATH")
           maxIndex = minIndex = maxIndex + 1;
         } else if (top.isMin) { // We are off the top or equal to top
@@ -258,7 +264,7 @@ console.log({what:"search", searchIndex, searchKey})
         // The search inside the leaf ends with maxIndex as the insert index:
         if (!leafOverflow) {
 console.log({leafNode, maxIndex, value, key})
-          lastNode = vnodeInsert(leafNode, maxIndex, value, key);
+          lastNode = vnodeInsert(leafNode, maxIndex, value, key, key);
           lastNodeLevel = level;
 
           if (stack.length == 1) {
@@ -270,7 +276,7 @@ console.log({leafNode, maxIndex, value, key})
           }
         } else { // In the overflow case we own the only reference to (created) the node and can mutate it
 console.log({what:"willSplit", maxIndex, value, key, level, "limit":leafNode.array.length})
-          vnodeMutateInsert(leafNode, maxIndex, value, key);
+          vnodeMutateInsert(leafNode, maxIndex, value, key, key);
 
           // The leaf is now dealt with, but since we're in the overflow path we have to handle splits.
           // We split the node above into lastLeft and lastRight. Now we need to put them in the tree, 
@@ -376,7 +382,8 @@ console.log({maxLevel, stackLength:stack.length})
       const nodeArray = node.array;
       if (nodeArray.length > 1) {
         const array = nodeArray.slice(1);
-        min = this._key(array[0]); // This is the only situation where a max must be calculated
+        min = this._key(array[0]); // This is the only situation where a new min must be calculated
+console.log({what: "minning", min, max:node.max})
         head = lastNode = new VNode(array, min, node.max);
       }
     }
@@ -390,7 +397,7 @@ console.log({what:"pruning", length:nodeArray.length, stackLengthAfter:stack.len
           // FIXME: By carefully shifting and popping it's actually possible to get a 1-length root despite this check.
           lastNode = nodeArray[arrayLength-1]; // Make that child the new root. // FIXME could this index be hardcoded to 1?
           min = lastNode.min;
-console.log({what:"Reroot", lastNode, min})
+console.log({what:"Reroot", lastNode, min, max:node.max})
           levelAdjust--;
         } else if (arrayLength > 1) { // Expected case: We found a suitable node
           const array = nodeArray.slice(1); // Mark we removed the leaf node (and maybe some parent branches)
@@ -483,7 +490,7 @@ console.log({what:"DidPruneWalk", lastNode, max, levelAdjust, walkLength})
     while (stack.length > 0) {
       const node = stack.pop();
 console.log({what:"FinalReplace", stackLength:stack.length, length:node.array.length})
-      lastNode = vnodeReplace(node, node.array.length-1, lastNode, max);
+      lastNode = vnodeReplace(node, node.array.length-1, lastNode, null, max);
     }
 
     return makeSortedList(this.size-1, maxLevel + levelAdjust, lastNode,
@@ -602,40 +609,40 @@ class VNode {
 }
 VNode.prototype[IS_SORTED_LIST_NODE_SYMBOL] = true
 
-function vnodeReplace(node, index, value, key) { // key optional if value is node
+function vnodeReplace(node, index, value, minKey, maxKey) { // key optional if value is node
   const array = [...node.array]; // Copy array
   array[index] = value;          // Replace index value
-  const min = index == 0 ? (key != null ? key : value.min) : node.min; // Adjust edges
-  const max = index == array.length-1 ? (key != null ? key : value.max) : node.max;
+  const min = index == 0 ? (minKey != null ? minKey : value.min) : node.min; // Adjust edges
+  const max = index == array.length-1 ? (maxKey != null ? maxKey : value.max) : node.max;
   return new VNode(array, min, max)
 }
 
-function vnodeInsert(node, index, value, key) { // key optional if value is node
+function vnodeInsert(node, index, value, minKey, maxKey) { // key optional if value is node
   const oldArray = node.array;
   const array = [...oldArray.slice(0,index), value, ...oldArray.slice(index)]
-  const min = index == 0 ? (key != null ? key : value.min) : node.min;
-  const max = index == oldArray.length ? (key != null ? key : value.max) : node.max;
-console.log({what:"insert", oldLength:oldArray.length, newLength:array.length, min, max, index, value, key})
+  const min = index == 0 ? (minKey != null ? minKey : value.min) : node.min;
+  const max = index == oldArray.length ? (maxKey != null ? maxKey : value.max) : node.max;
+console.log({what:"insert", oldLength:oldArray.length, newLength:array.length, min, max, index, value, minKey, maxKey})
   return new VNode(array, min, max)
 }
 
-function vnodeMutateReplace(node, index, value, key) { // key optional if value is node
+function vnodeMutateReplace(node, index, value, minKey, maxKey) { // key optional if value is node
   node.array[index] = value;
   if (index == 0)
-    node.min = (key != null ? key : value.min);
+    node.min = (minKey != null ? minKey : value.min);
   if (index == node.array.length-1)
-    node.max = (key != null ? key : value.max);
+    node.max = (maxKey != null ? maxKey : value.max);
 }
 
-function vnodeMutateInsert(node, index, value, key) { // key optional if value is node
+function vnodeMutateInsert(node, index, value, minKey, maxKey) { // key optional if value is node
 console.log({what:"preMutate", index, array:[...node.array]})
   node.array.splice(index, 0, value);
 console.log({what:"postMutate", index, array:[...node.array], len:node.array.length})
 
   if (index == 0)
-    node.min = (key != null ? key : value.min);
+    node.min = (minKey != null ? minKey : value.min);
   if (index == node.array.length-1)
-    node.max = (key != null ? key : value.max);
+    node.max = (maxKey != null ? maxKey : value.max);
 }
 
 function makeSortedList(size, level, root, head, tail, keyFn, ltFn, hash) {
