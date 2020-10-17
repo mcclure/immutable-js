@@ -83,21 +83,26 @@ export function isSortedList(maybeList) {
 export class SortedList extends SetCollection {
   // @pragma Construction
 
-  constructor(value) {
+  constructor(value, keyFn, ltFn) {
     const empty = emptySortedList();
     if (value === null || value === undefined) {
-      return empty;
+      if (!keyFn && !ltFn)
+        return empty;
+      return makeSortedList(0,0,null,null,null,keyFn,ltFn);
     }
-    if (isSortedList(value)) {
+    if (isSortedList(value) && value._keyFn == keyFn && value._ltFn == ltFn) {
       return value;
     }
     const iter = IndexedCollection(value);
     const size = iter.size;
+    const typedEmpty = makeSortedList(0,0,null,null,null,keyFn,ltFn)
     if (size === 0) {
-      return empty;
+      if (!keyFn && !ltFn)
+        return empty;
+      return typedEmpty;
     }
     assertNotInfinite(size);
-    return empty.withMutations(list => {
+    return typedEmpty.withMutations(list => {
       iter.forEach((v) => list.add(v));
     });
   }

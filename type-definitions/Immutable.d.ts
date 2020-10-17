@@ -667,13 +667,18 @@ declare module Immutable {
    * and access or removal at either end. SortedLists can thus be used as a
    * priority queue.
    *
-   * SortedLists are immutable and fully persistent with insert, reading from
-   * either end, or removal from either end between O(log16 N) and O(log32 N).
+   * SortedLists are immutable and fully persistent with O(1) reads from
+   * either end, O(n) iteration, and insert and removal (from either end)
+   * between O(log16 N) and O(log32 N).
    *
-   * Sorting is handled by a "key function" provided at list creation. The key
-   * function transforms a SortedList value into a value that supports JS
-   * inequality. If no key function is provided the list values are assumed
-   * to be comparable values such as string or number.
+   * Sorting is managed by two optional callbacks provided at list creation,
+   * a "key function" and a "less-than function". When comparing two values,
+   * the key function is called on both values and the result is passed to
+   * the less-than function. By default the key function returns the value,
+   * and less-than uses normal JS <. This means you have two ways to customize
+   * sort order. You can use the key function to reduce your values to a
+   * sortable value (for example, if your values are objects, your key function
+   * could return an "id" member), or you can implement less-than.
    */
   export module SortedList {
 
@@ -742,11 +747,14 @@ declare module Immutable {
    * listFromPlainSet.equals(listFromPlainArray) // true
    * ```
    */
-  export function SortedList(): SortedList<unknown>;
-  export function SortedList<T>(): SortedList<T>;
-  export function SortedList<T>(collection: Iterable<T>): SortedList<T>;
+  export function SortedList(): SortedList<unknown,unknown>;
+  export function SortedList<T>(): SortedList<T,T>;
+  export function SortedList<T,K>(null, keyFn:(T)=>K, ltFn?:(K,K)=>boolean): SortedList<T,T>;
+  export function SortedList<T,K>(sortedList: SortedList<T,K>): SortedList<T,K>;
+  export function SortedList<T>(collection: Iterable<T>): SortedList<T,T>;
+  export function SortedList<T>(collection: Iterable<T>, keyFn:(T)=>K, ltFn?:(K,K)=>boolean): SortedList<T,T>;
 
-  export interface SortedList<T> extends Collection.Set<T> {
+  export interface SortedList<T,K> extends Collection.Set<T> {
 
     /**
      * The number of items in this List.
@@ -763,7 +771,7 @@ declare module Immutable {
      *
      * Note: `add` can be used in `withMutations`.
      */
-    add(value: T): SortedList<T>;
+    add(value: T): SortedList<T,K>;
 
     // TODO-ANDI: delete/remove with specific value
     // TODO-ANDI: mass-add
@@ -781,7 +789,7 @@ declare module Immutable {
      *
      * Note: `clear` can be used in `withMutations`.
      */
-    clear(): SortedList<T>;
+    clear(): SortedList<T,K>;
 
     /**
      * Returns a new SortedList with a size one less than this SortedList,
@@ -798,7 +806,7 @@ declare module Immutable {
      *
      * Note: `pop` can be used in `withMutations`.
      */
-    pop(): SortedList<T>;
+    pop(): SortedList<T,K>;
 
     /**
      * Returns a new SortedList with a size one less than this SortedList,
@@ -818,7 +826,7 @@ declare module Immutable {
      *
      * Note: `shift` can be used in `withMutations`.
      */
-    shift(): SortedList<T>;
+    shift(): SortedList<T,K>;
 
     // TODO-ANDI: update
 
@@ -865,7 +873,7 @@ declare module Immutable {
      *
      * @alias merge
      */
-    merge<C>(...collections: Array<Iterable<C>>): SortedList<T | C>;
+    merge(...collections: Array<Iterable<T>>): SortedList<T,K>;
 
     /**
      * Returns a new SortedList with values passed through a
@@ -886,20 +894,20 @@ declare module Immutable {
      *     Set([1,2]).map(x => 10 * x)
      *     // Set [10,20]
      */
-    map<M>(
-      mapper: (value: T, key: T, iter: this) => M,
+    map(
+      mapper: (value: T, key: T, iter: this) => T,
       context?: unknown
-    ): SortedList<M>;
+    ): SortedList<T,K>;
 
     /**
      * Flat-maps the SortedList, returning a new SortedList.
      *
      * Similar to `list.map(...).flatten(true)`.
      */
-    flatMap<M>(
-      mapper: (value: T, key: T, iter: this) => Iterable<M>,
+    flatMap<T>(
+      mapper: (value: T, key: T, iter: this) => Iterable<T>,
       context?: unknown
-    ): SortedList<M>;
+    ): SortedList<T,K>;
 
     /**
      * Returns a new SortedList with only the values for which the `predicate`
