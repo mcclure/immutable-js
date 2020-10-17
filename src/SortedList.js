@@ -422,9 +422,17 @@ console.log({what:"DidPruneWalk", lastNode, min, levelAdjust, walkLength})
 console.log({what:"FinalReplace", stackLength:stack.length, length:node.array.length})
       lastNode = vnodeReplace(node, 0, lastNode, min);
     }
-    // Last ditch, rare check: Did we just accidentally create a branch node with exactly one element and set it as root?
+    // Last ditch, rare check: Did we just accidentally create a root branch node with exactly one element?
+    // This can happen when mixing shifts and pops, and it must be checked for to prevent a bug with setting head/tail
     while (lastNode.array.length == 1 && levelAdjust < maxLevel-1) {
       lastNode = lastNode.array[0];
+      levelAdjust++;
+    }
+    // Laster ditch, rarer check: Did we just accidentally create a root branch node whose children have one element each?
+    // This can happen when mixing shifts and pops, and there is no reason to avoid it other than performance.
+    while (lastNode.array.length == 2 && levelAdjust < maxLevel-2 &&
+           lastNode.array[0].array.length == 1 && lastNode.array[1].array.length == 1) {
+      lastNode = new VNode([lastNode.array[0].array[0], lastNode.array[1].array[0]], lastNode.min, lastNode.max)
       levelAdjust++;
     }
 
@@ -498,9 +506,17 @@ console.log({what:"DidPruneWalk", lastNode, max, levelAdjust, walkLength})
 console.log({what:"FinalReplace", stackLength:stack.length, length:node.array.length})
       lastNode = vnodeReplace(node, node.array.length-1, lastNode, null, max);
     }
-    // Last ditch, rare check: Did we just accidentally create a branch node with exactly one element and set it as root?
+    // Last ditch, rare check: Did we just accidentally create a root branch node with exactly one element?
+    // This can happen when mixing shifts and pops, and it must be checked for to prevent a bug with setting head/tail
     while (lastNode.array.length == 1 && levelAdjust < maxLevel-1) {
       lastNode = lastNode.array[0];
+      levelAdjust++;
+    }
+    // Laster ditch, rarer check: Did we just accidentally create a root branch node whose children have one element each?
+    // This can happen when mixing shifts and pops, and there is no reason to avoid it other than performance.
+    while (lastNode.array.length == 2 && levelAdjust < maxLevel-2 &&
+           lastNode.array[0].array.length == 1 && lastNode.array[1].array.length == 1) {
+      lastNode = new VNode([lastNode.array[0].array[0], lastNode.array[1].array[0]], lastNode.min, lastNode.max)
       levelAdjust++;
     }
 
