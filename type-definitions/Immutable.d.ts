@@ -749,10 +749,10 @@ declare module Immutable {
    */
   export function SortedList(): SortedList<unknown,unknown>;
   export function SortedList<T>(): SortedList<T,T>;
-  export function SortedList<T,K=T>(emptyList:null, keyFn:(T)=>K, ltFn?:(K,K)=>boolean): SortedList<T,T>;
+  export function SortedList<T,K=T>(emptyList:null, keyFn:(T)=>K, ltFn?:(K,K)=>boolean): SortedList<T,K>;
   export function SortedList<T,K=T>(sortedList: SortedList<T,K>): SortedList<T,K>;
   export function SortedList<T>(collection: Iterable<T>): SortedList<T,T>;
-  export function SortedList<T,K=T>(collection: Iterable<T>, keyFn:(T)=>K, ltFn?:(K,K)=>boolean): SortedList<T,T>;
+  export function SortedList<T,K=T>(collection: Iterable<T>, keyFn:(T)=>K, ltFn?:(K,K)=>boolean): SortedList<T,K>;
 
   export interface SortedList<T,K=T> extends Collection.Set<T> {
 
